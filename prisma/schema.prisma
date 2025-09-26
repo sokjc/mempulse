@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Survey {
+  id          String     @id @default(cuid())
+  slug        String     @unique
+  title       String
+  description String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  questions Question[]
+  responses Response[]
+  summaries DailySummary[]
+}
+
+model Question {
+  id          String   @id @default(cuid())
+  surveyId    String
+  slug        String
+  text        String
+  type        String   // 'single', 'multiple', 'text'
+  order       Int
+  options     Json?    // Array of options for single/multiple choice
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  survey  Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  answers Answer[]
+
+  @@unique([surveyId, slug])
+  @@index([surveyId])
+}
+
+model Response {
+  id              String   @id @default(cuid())
+  surveyId        String
+  respondentName  String?
+  respondentEmail String?
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime @default(now())
+
+  survey  Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  answers Answer[]
+
+  @@index([surveyId])
+  @@index([createdAt])
+}
+
+model Answer {
+  id         String   @id @default(cuid())
+  responseId String
+  questionId String
+  value      String   // For single/multiple: the selected option(s); for text: the text response
+  createdAt  DateTime @default(now())
+
+  response Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([responseId, questionId])
+  @@index([questionId])
+  @@index([responseId])
+}
+
+model AdminUser {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  image         String?
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model DailySummary {
+  id         String   @id @default(cuid())
+  surveyId   String
+  questionId String
+  date       DateTime @db.Date
+  data       Json     // { counts: {option: count}, total: number, mean?: number }
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  survey   Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([surveyId, questionId, date])
+  @@index([surveyId])
+  @@index([questionId])
+  @@index([date])
+}
